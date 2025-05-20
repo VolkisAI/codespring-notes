@@ -1,0 +1,105 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+description: A step-by-step checklist for building the Note Taker (Tutorial) application. globs: "*", alwaysApply: false
+
+# Note Taker App - Build Checklist
+
+This checklist outlines the steps to build the Note Taker application, based on the project overview.
+
+## Phase 1: Backend & Foundation (Mostly Complete)
+
+- [x] Author Drizzle schema files under `/db/schema` ([notes.ts](mdc:db/schema/notes.ts), [categories.ts](mdc:db/schema/categories.ts)).
+- [x] Run `drizzle-kit generate` to create migration scripts.
+- [x] Generate query helpers under `/db/queries` ([notes-queries.ts](mdc:db/queries/notes-queries.ts), [categories-queries.ts](mdc:db/queries/categories-queries.ts)).
+- [x] Implement CRUD server actions under `/actions` ([note-actions.ts](mdc:actions/note-actions.ts) for create-note, update-note, delete-note(s); [category-actions.ts](mdc:actions/category-actions.ts) for create-category, update-category).
+- [ ] **TODO:** Add Row Level Security (RLS) to `notes` and `categories` tables in Supabase.
+
+## Phase 2: Core UI & Features
+
+The next steps focus on building out the user interface, starting with viewing notes.
+
+1.  **Implement Note Navigation (View All Notes):**
+    *   [x] Create `/app/notes/page.tsx` for the main notes listing.
+    *   [x] Scaffold UI with ShadCN components:
+        *   [x] Create `[/components/note-navigation/notes-board.tsx](mdc:components/note-navigation/notes-board.tsx)` (displays notes via `note-card.tsx` in `category-column.tsx`)
+        *   [x] Create `[/components/note-navigation/note-filter.tsx](mdc:components/note-navigation/note-filter.tsx)` for category filtering and sorting.
+    *   [x] Fetch and display notes, initially without category grouping or advanced filtering.
+        *   [x] Fetch user-specific and base categories in `/app/dashboard/notes/page.tsx`.
+        *   [x] Pass categories to `NotesBoard`, then to `CategoryColumn` for display.
+        *   [x] Pass categories to `AddNoteModal` for selection dropdown.
+        *   [x] Implement click on `NoteCard` to navigate to note detail page.
+        *   [x] Redirect to new note detail page after creation from `AddNoteModal`.
+    *   [ ] Ensure users land on `/notes` after login (requires Clerk setup).
+
+2.  **Implement Note Details Page:**
+    *   [x] Create `/app/dashboard/notes/[note-id]/page.tsx` for viewing/editing a single note.
+    *   [x] Scaffold UI with ShadCN components:
+        *   [x] Create `[/components/note-details/note-header.tsx](mdc:components/note-details/note-header.tsx)` (title, category, dates, actions menu, back button).
+        *   [x] Create `[/components/note-details/note-editor.tsx](mdc:components/note-details/note-editor.tsx)` (to contain the rich text editor - basic display for now).
+    *   [x] Clicking a note in the list view should navigate to its detail page.
+    *   [x] Back button in `note-header.tsx` navigates to notes board.
+
+3.  **Integrate Rich Text Editor:**
+    *   [ ] Choose and integrate a Rich Text Editor library (e.g., TipTap or Slate).
+    *   [ ] Create `[/components/rich-text-editor/rich-text-toolbar.tsx](mdc:components/rich-text-editor/rich-text-toolbar.tsx)`.
+    *   [ ] Create `[/components/rich-text-editor/Editor.tsx](mdc:components/rich-text-editor/Editor.tsx)`.
+    *   [ ] Enable basic editing and save functionality (updates `notes.content`).
+
+4.  **Implement Category Management:**
+    *   [ ] Seed default categories on user sign-up (part of Clerk auth callback).
+    *   [ ] In `note-header.tsx`, implement category dropdown:
+        *   [ ] Create `[/components/category-management/category-dropdown.tsx](mdc:components/category-management/category-dropdown.tsx)`.
+        *   [ ] Allow changing a note's category.
+    *   [ ] Implement "Manage Categories" modal:
+        *   [ ] Create `[/components/category-management/category-modal.tsx](mdc:components/category-management/category-modal.tsx)`.
+        *   [ ] Allow users to add/edit categories (name and color).
+
+5.  **Implement Delete Notes Functionality:**
+    *   [ ] Single delete:
+        *   [ ] Add "Delete" option to `note-header.tsx` burger menu.
+        *   [ ] Create `[/components/delete-notes/delete-confirm-modal.tsx](mdc:components/delete-notes/delete-confirm-modal.tsx)`.
+    *   [ ] Bulk delete (in `/notes` page):
+        *   [ ] Add checkboxes to `note-list.tsx`.
+        *   [ ] Create `[/components/delete-notes/bulk-delete-toolbar.tsx](mdc:components/delete-notes/bulk-delete-toolbar.tsx)`.
+
+## Phase 3: Iterative Feature Implementation & Refinement
+
+This phase involves fleshing out the features based on the initial scaffold.
+
+- [ ] **Clerk Authentication & Routing Guard:**
+    *   [ ] Complete Clerk setup in `[/app/layout.tsx](mdc:app/layout.tsx)` and middleware.
+    *   [ ] Ensure all note/category operations are authenticated and user-scoped.
+- [ ] **Categories Seeding & Listing:**
+    *   [ ] Implement logic to seed default categories for new users.
+    *   [ ] Display categories in `/notes` (e.g., Trello-style columns or filter chips).
+- [ ] **Note Navigation Enhancements:**
+    *   [ ] Implement sorting by creation date/title.
+    *   [ ] Implement filtering by category.
+    *   [ ] Handle empty states (no notes, no filter matches).
+- [ ] **Note Details Page Enhancements:**
+    *   [ ] Implement rich-text editor toolbar functionality (bold, italic, etc.).
+    *   [ ] Implement autosave for drafts.
+    *   [ ] Apply category color to editor border.
+- [ ] **Category Management Modal Enhancements:**
+    *   [ ] Add color picker/presets for category colors.
+    *   [ ] Implement logic for adding/editing categories via server actions.
+- [ ] **Single and Bulk Delete Flows:**
+    *   [ ] Wire up delete buttons to server actions.
+    *   [ ] Implement confirmation modals.
+    *   [ ] Refresh UI on successful deletion.
+
+## Phase 4: Testing & Deployment
+
+- [ ] Write unit & integration tests for each server action and component.
+- [ ] Configure CI workflow (GitHub Actions) to run tests and lint.
+- [ ] Deploy to Vercel on merge to main.
+
+## Non-Functional Requirements Considerations (Ongoing)
+- [ ] Performance: Lazy-load heavy editor bundle.
+- [ ] Scalability: Paginate notes list for >1000 notes.
+- [ ] Security: Sanitize HTML, enforce row-level security via Supabase policies (see Phase 1 TODO).
+- [ ] Logging: Capture server-action errors to Sentry.
+- [ ] Rate limiting: 10 writes/min per user.

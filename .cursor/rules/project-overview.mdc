@@ -1,0 +1,211 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+description: Overview and guidelines for the Note Taker (Tutorial) project, globs: "*", alwaysApply: true
+
+1. Introduction & Goals
+The Note Taker (Tutorial) application is a minimal viable note-taking platform that enables authenticated users to create, browse, edit, categorize, and delete rich-text notes.
+Primary goals:
+• Provide a clear, scrollable list view of notes grouped by category.
+• Offer an in-place note detail page with a rich-text editor and category management.
+• Support single and bulk deletion of notes.
+• Allow users to define and apply pastel colors to categories.
+
+2. Problem Statement & Target Audience
+Many students and professionals struggle to keep notes organized, accessible, and visually distinguishable. Current tools can be overkill or lack basic customization (e.g., pastel-colored categories).
+Target Audience (from contextualJson):
+
+Students: Efficiently organize class notes, filter by subject, and review prior to exams.
+Professionals: Keep track of meeting minutes, project notes, and to-dos.
+3. Feature Deep-Dive
+3.1 Note Navigation
+Plain-language description & user journey
+
+After login, users land on a /notes page.
+Notes render as a vertical list or "Trello-style" columns per category with subtle pastel backgrounds.
+Users can sort by creation date or title and filter by category via a dropdown or chips.
+Clicking a note opens its detail view.
+Interaction & dependencies
+
+Depends on Category Management for grouping/colored columns.
+Integrates with Delete Notes for single/multi-select deletion.
+Launches Note Details on click.
+Minimal database schema (Drizzle ORM TS):
+
+import { pgTable, serial, text, uuid, timestamp, varchar } from "drizzle-orm/pg-core";
+
+export const categories = pgTable("categories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  user_id: varchar("user_id", { length: 255 }).notNull(),
+  name: text("name").notNull(),
+  color: varchar("color", { length: 7 }).notNull(), // e.g. "#aabbcc"
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const notes = pgTable("notes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  user_id: varchar("user_id", { length: 255 }).notNull(),
+  category_id: uuid("category_id")
+    .references(() => categories.id)
+    .notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+Edge cases & assumptions
+If a category has no notes, its column still appears.
+Default categories seeded on user sign-up.
+Filtering with no matches shows an "empty state" message.
+3.2 Note Details
+Plain-language description & user journey
+
+URL: /notes/[note-id] loaded via client-side routing.
+Header displays title, category dropdown (click to change), creation date, and a burger menu for actions (delete).
+Below header: formatting toolbar (font size, bold, italic, alignment, bullet list, H3).
+Main area: rich-text editor where content is editable inline.
+"Back" button returns to /notes.
+Interaction & dependencies
+
+Renders existing notes and categories tables.
+Uses Rich Text Editor for editing content.
+Changing category updates notes.category_id.
+Delete action invokes Delete Notes flow.
+Minimal database impact
+
+Reuses notes table above.
+No additional tables required.
+Edge cases & assumptions
+
+Draft autosave on blur or after user stops typing for 2 seconds.
+Category change without saving reverts on navigation away if no save.
+If note not found (invalid ID), show 404 state.
+3.3 Rich Text Editor
+Plain-language description & user journey
+
+Integrated in Note Details page.
+Toolbar buttons: bold, italic, underline, font size dropdown, alignment (left/center/right), bullet list, H3 header.
+Content stored as sanitized HTML string in notes.content.
+Interaction & dependencies
+
+Live-updates notes.content via server actions.
+Category border color applied to editor container via CSS custom property.
+Minimal database impact
+
+Uses notes.content column.
+Edge cases & assumptions
+
+Strip disallowed tags to prevent XSS.
+Limit content length to, e.g., 50,000 characters.
+3.4 Delete Notes
+Plain-language description & user journey
+
+Single delete: In note header's burger menu, click "Delete," confirm modal → delete note and redirect to /notes.
+Bulk delete: In /notes, checkbox per note and a "Select All" toggle. Toolbar "Delete" button appears when ≥1 selected. Confirmation dialog to delete.
+Interaction & dependencies
+
+Invokes server-side delete action removing rows from notes.
+On deletion, UI list refreshes.
+Minimal database impact
+
+Deletes rows from notes table by id and user_id.
+Edge cases & assumptions
+
+Prevent deleting the last note in a category if that category must always exist (we assume categories persist independently).
+Handle concurrent deletes gracefully (note already deleted).
+3.5 Category Management
+Plain-language description & user journey
+
+Default categories (Work, School, Personal, etc.) seeded at signup.
+On /notes/[id], clicking category name opens dropdown with existing categories plus "Manage Categories" link.
+"Manage Categories" opens modal listing categories with name and color, with "Add" and "Edit" capabilities.
+Add/Edit: choose name and pastel color via color picker or preset swatches.
+Interaction & dependencies
+
+Seed default categories on auth callback.
+Dropdown uses live query of categories table.
+Adding/editing categories triggers create/update server actions.
+Minimal database schema
+
+Reuses categories table defined above.
+Edge cases & assumptions
+
+Prevent duplicate category names per user.
+Limit to a maximum of, e.g., 20 categories.
+4. Overall Build Roadmap
+Author Drizzle schema files under /db/schema (notes.ts, categories.ts).
+Run drizzle-kit generate to create migration scripts.
+Generate query helpers under /db/queries (notes-queries.ts, categories-queries.ts).
+Implement CRUD server actions under /actions (create-note, update-note, delete-note(s), create-category, update-category).
+Configure Clerk authentication in /app/layout.tsx and server middleware.
+Scaffold baseline UI with ShadCN components:
+Create /components/note-navigation
+Create /components/note-details
+Create /components/rich-text-editor
+Create /components/delete-notes
+Create /components/category-management
+Implement features iteratively:
+a. Clerk auth + routing guard
+b. Categories seed + listing
+c. Note Navigation list view with filters
+d. Note Details page + rich-text editor toolbar
+e. Category dropdown + management modal
+f. Single and bulk delete flows
+Write unit & integration tests for each server action and component.
+Configure CI workflow (GitHub Actions) to run tests and lint.
+Deploy to Vercel on merge to main.
+5. Suggested File / Folder Structure
+/app
+  /notes
+    page.tsx               # Note Navigation
+    [note-id]
+      page.tsx             # Note Details
+/db
+  /schema
+    categories.ts
+    notes.ts
+  /queries
+    categories-queries.ts
+    notes-queries.ts
+/actions
+  note-actions.ts          # create-note/update-note/delete-note(s) functions
+  category-actions.ts      # create-category/update-category functions
+/components
+  /note-navigation
+    note-list.tsx
+    note-filter.tsx
+  /note-details
+    note-header.tsx
+    note-editor.tsx
+  /rich-text-editor
+    rich-text-toolbar.tsx
+    Editor.tsx
+  /delete-notes
+    delete-confirm-modal.tsx
+    bulk-delete-toolbar.tsx
+  /category-management
+    category-dropdown.tsx
+    category-modal.tsx
+6. Technology Stack
+Next.js 14 (App Router & SSR)
+Supabase (Postgres)
+Drizzle ORM
+Clerk (Auth)
+Tailwind CSS + ShadCN UI
+Deployment: Vercel
+Additional:
+Rich Text Editor Library (e.g., TipTap or Slate)
+7. Non-Functional Requirements (optional)
+Performance: Lazy-load heavy editor bundle.
+Scalability: Paginate notes list for >1000 notes.
+Security: Sanitize HTML, enforce row-level security via Supabase policies.
+Logging: Capture server-action errors to Sentry.
+Rate limiting: 10 writes/min per user.
+8. Future Considerations (optional)
+Note sharing/collaboration with permissions.
+Tagging in addition to categories.
+Full-text search across notes.
+Mobile offline support and sync.
+Version history and undo/redo within editor.
