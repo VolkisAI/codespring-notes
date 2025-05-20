@@ -2,13 +2,13 @@
  * NoteCard Component
  * 
  * Purpose:
- * This component displays a summary of a single note, typically including its
- * title and creation date. It is a clickable card that navigates to the
- * detailed note view.
+ * This component displays a summary of a single note with a modern, clean design.
+ * It shows the note title and metadata with subtle visual styling.
  * 
  * Functionality:
  * - Receives note data (SelectNote) as props.
- * - Renders the note's title and formatted creation date.
+ * - Renders the note's title and formatted date information.
+ * - Provides visual feedback for interaction states.
  * - Handles click events to navigate to the note's detail page.
  * 
  * Location:
@@ -18,21 +18,32 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { SelectNote } from '@/db/schema/notes-schema'; // Use actual SelectNote type
+import { SelectNote } from '@/db/schema/notes-schema';
+import { Calendar, Clock } from 'lucide-react';
 
 interface NoteCardProps {
-  note: SelectNote; // Changed from PlaceholderNote
-  // onClick prop is removed as navigation is handled internally
+  note: SelectNote;
 }
 
 const NoteCard: React.FC<NoteCardProps> = ({ note }) => {
   const router = useRouter();
 
+  // Format date with shorter output for better display
   const formattedDate = new Date(note.createdAt).toLocaleDateString('en-US', {
-    year: 'numeric',
     month: 'short',
     day: 'numeric',
   });
+
+  // Check if the note was updated
+  const isUpdated = note.updatedAt && note.updatedAt.getTime() > note.createdAt.getTime();
+  
+  // Format updated date if applicable
+  const formattedUpdateDate = isUpdated 
+    ? new Date(note.updatedAt).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      })
+    : null;
 
   const handleCardClick = () => {
     router.push(`/dashboard/notes/${note.id}`);
@@ -40,8 +51,8 @@ const NoteCard: React.FC<NoteCardProps> = ({ note }) => {
 
   return (
     <div 
-      className="p-3 border rounded-md shadow-sm bg-white hover:shadow-lg hover:border-blue-500 transition-all duration-150 ease-in-out cursor-pointer active:shadow-inner"
-      onClick={handleCardClick} // Internal click handler for navigation
+      className="bg-white border border-gray-200 rounded-md overflow-hidden transition-all duration-200 ease-in-out group hover:shadow-md hover:border-blue-300 cursor-pointer"
+      onClick={handleCardClick}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -51,16 +62,28 @@ const NoteCard: React.FC<NoteCardProps> = ({ note }) => {
       }}
       title={`View note: ${note.title}`}
     >
-      <h3 className="text-md font-semibold text-gray-800 mb-1 truncate">
-        {note.title}
-      </h3>
-      <p className="text-xs text-gray-500">
-        {/* Displaying updatedAt if it's different and more recent than createdAt can be useful */}
-        {note.updatedAt && note.updatedAt.getTime() > note.createdAt.getTime() 
-          ? `Updated: ${new Date(note.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-          : `Created: ${formattedDate}`}
-      </p>
-      {/* Future additions: excerpt, tags */}
+      <div className="p-3">
+        <h3 className="font-medium text-gray-900 mb-2 group-hover:text-blue-600 transition-colors truncate">
+          {note.title}
+        </h3>
+        
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <div className="flex items-center gap-1">
+            <Calendar className="h-3 w-3" />
+            <span>{formattedDate}</span>
+          </div>
+          
+          {isUpdated && (
+            <div className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              <span>Updated {formattedUpdateDate}</span>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Add subtle highlight bar at bottom for visual interest */}
+      <div className="h-1 bg-gradient-to-r from-blue-400 to-indigo-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
     </div>
   );
 };

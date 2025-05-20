@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { SelectNote, SelectCategory } from '@/db/schema';
+import { updateNoteAction } from '@/actions/notes-actions';
 
 interface NoteHeaderProps {
   note: SelectNote;
@@ -62,7 +63,30 @@ const NoteHeader: React.FC<NoteHeaderProps> = ({ note, category }) => {
   };
 
   const handleTitleSave = async () => {
-    console.log('Saving title (placeholder):', currentTitle);
+    if (currentTitle === note.title || currentTitle.trim() === "") {
+      setIsEditingTitle(false);
+      setCurrentTitle(note.title); // Reset if empty or unchanged
+      return;
+    }
+    try {
+      console.log('Attempting to save title:', currentTitle);
+      const result = await updateNoteAction(note.id, { title: currentTitle.trim() });
+      if (result.isSuccess && result.data) {
+        console.log('Title saved successfully:', result.data.title);
+        // Optionally, update local state `note.title` if the parent component doesn't re-fetch/re-render
+        // For now, assuming re-render or relying on `useEffect` for `note.title` prop change
+        setCurrentTitle(result.data.title); // Update with the saved title
+      } else {
+        console.error('Failed to save title:', result.message);
+        // Revert to original title on failure to avoid UI mismatch
+        setCurrentTitle(note.title);
+        // alert(`Error saving title: ${result.message}`); // Basic user feedback
+      }
+    } catch (error) {
+      console.error('Error in handleTitleSave:', error);
+      setCurrentTitle(note.title); // Revert on unexpected error
+      // alert('An unexpected error occurred while saving the title.');
+    }
     setIsEditingTitle(false);
   };
 
@@ -72,6 +96,9 @@ const NoteHeader: React.FC<NoteHeaderProps> = ({ note, category }) => {
 
   const handleInputBlur = () => {
     if (currentTitle !== note.title) {
+      handleTitleSave();
+    } else {
+      setIsEditingTitle(false); // If no change, just exit editing mode
     }
   };
   

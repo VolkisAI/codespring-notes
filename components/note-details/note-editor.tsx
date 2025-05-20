@@ -17,14 +17,14 @@
  */
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Color } from '@tiptap/extension-color';
 import TextStyle from '@tiptap/extension-text-style';
 import RichTextToolbar from '@/components/rich-text-editor/RichTextToolbar';
-// import { updateNoteContentAction } from '@/actions/note-actions'; // For saving content later
+import { updateNoteAction } from '@/actions/notes-actions';
 
 interface NoteEditorProps {
   noteId: string; // For saving
@@ -33,12 +33,45 @@ interface NoteEditorProps {
   onContentChange?: (htmlContent: string) => void; // Optional: for immediate parent feedback
 }
 
+const SAVE_DEBOUNCE_DELAY = 1500; // 1.5 seconds
+
 const NoteEditor: React.FC<NoteEditorProps> = ({ 
   noteId, 
   initialContent, 
   categoryColor,
   onContentChange 
 }) => {
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSavedContent, setLastSavedContent] = useState(initialContent);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounced save function
+  const debouncedSave = useCallback(
+    async (htmlContent: string) => {
+      if (htmlContent === lastSavedContent) {
+        console.log("NoteEditor: Content unchanged, skipping save.");
+        return;
+      }
+      setIsSaving(true);
+      console.log("NoteEditor: Debounced save triggered for noteId:", noteId);
+      try {
+        const result = await updateNoteAction(noteId, { content: htmlContent });
+        if (result.isSuccess) {
+          console.log("NoteEditor: Content saved successfully.");
+          setLastSavedContent(htmlContent);
+        } else {
+          console.error("NoteEditor: Failed to save content - ", result.message);
+          // TODO: Consider adding user feedback for save failure (e.g., toast notification)
+        }
+      } catch (error) {
+        console.error("NoteEditor: Error during debounced save - ", error);
+        // TODO: User feedback
+      }
+      setIsSaving(false);
+    },
+    [noteId, lastSavedContent] // Dependencies for useCallback
+  );
+
   const editor = useEditor({
     extensions: [
       StarterKit, // Using default StarterKit to ensure all basic extensions are enabled
@@ -57,15 +90,31 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     },
     onUpdate: ({ editor: currentEditor }) => {
       const html = currentEditor.getHTML();
-      const json = currentEditor.getJSON();
-      console.log("NoteEditor: onUpdate - HTML content:", html);
-      console.log("NoteEditor: onUpdate - JSON content:", JSON.stringify(json, null, 2));
       if (onContentChange) {
         onContentChange(html);
       }
-      // Future: Debounce this and call updateNoteContentAction(noteId, html);
+
+      // Clear previous timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
+      // Setup a new timeout to call debouncedSave
+      saveTimeoutRef.current = setTimeout(() => {
+        debouncedSave(html);
+      }, SAVE_DEBOUNCE_DELAY);
     },
   });
+
+  // Effect to clear timeout on unmount or if editor/debouncedSave changes
+  useEffect(() => {
+    // Cleanup function to clear the timeout
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []); // Empty dependency array means this runs on mount and cleans up on unmount
 
   useEffect(() => {
     if (editor && editor.isEditable) {
@@ -74,7 +123,8 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
         console.log("NoteEditor: useEffect - initialContent changed. Updating editor content.");
         console.log("NoteEditor: useEffect - Old editor content:", currentEditorContent);
         console.log("NoteEditor: useEffect - New initialContent:", initialContent);
-        editor.commands.setContent(initialContent, false); // Set content without emitting update initially if it differs
+        editor.commands.setContent(initialContent, false); 
+        setLastSavedContent(initialContent); // Update lastSavedContent when initialContent changes
       }
     }
   }, [initialContent, editor]);

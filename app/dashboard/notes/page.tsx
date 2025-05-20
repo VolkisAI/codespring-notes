@@ -4,12 +4,12 @@
  * Purpose:
  * This page serves as the entry point for the note navigation feature,
  * displaying the main NotesBoard component that allows users to view and manage
- * their notes in a Trello-like interface.
+ * their notes in a modern, professional interface.
  * 
  * Functionality:
  * - Fetches user-specific and base categories.
  * - Imports and renders the NotesBoard component, passing categories to it.
- * - Provides the overall page structure for the note navigation view.
+ * - Provides the overall page structure with optimized layout.
  * 
  * Location:
  * /app/dashboard/notes/page.tsx
@@ -47,7 +47,7 @@ const NoteNavigationPage = async () => {
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full min-h-screen bg-gradient-to-b from-gray-50 to-white">
       {/* 
         The NotesBoard component handles its own padding and layout internally,
         so we typically don't need to add extra containers here unless 

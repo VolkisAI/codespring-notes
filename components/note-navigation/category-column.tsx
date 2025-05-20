@@ -17,8 +17,9 @@
  */
 import React from 'react';
 import NoteCard from './note-card';
-import { SelectCategory } from '@/db/schema/categories-schema'; // Using actual type
-import { SelectNote } from '@/db/schema/notes-schema'; // Import SelectNote
+import { SelectCategory } from '@/db/schema/categories-schema';
+import { SelectNote } from '@/db/schema/notes-schema';
+import { Badge } from '@/components/ui/badge';
 
 // PlaceholderNote can be refined or replaced when actual note fetching is implemented
 // For now, assuming it's compatible with what NoteCard expects or NoteCard uses a similar placeholder.
@@ -30,8 +31,8 @@ import { SelectNote } from '@/db/schema/notes-schema'; // Import SelectNote
 // }
 
 interface CategoryColumnProps {
-  category: SelectCategory; // Changed to SelectCategory
-  notes: SelectNote[]; // Changed to SelectNote[]
+  category: SelectCategory;
+  notes: SelectNote[];
 }
 
 const CategoryColumn: React.FC<CategoryColumnProps> = ({ category, notes }) => {
@@ -40,27 +41,51 @@ const CategoryColumn: React.FC<CategoryColumnProps> = ({ category, notes }) => {
   // };
 
   return (
-    <div 
-      className="p-4 rounded-lg shadow-md bg-white h-full flex flex-col min-h-[300px] max-h-[calc(100vh-200px)]"
-      style={{ borderTop: `4px solid ${category.color}` }}
-    >
-      <h2 
-        className="text-xl font-semibold mb-4 pb-2 border-b sticky top-0 bg-white z-10"
-        style={{ color: category.color, borderBottomColor: category.color + '40' }} 
+    <div className="flex flex-col h-full bg-white rounded-lg shadow-sm overflow-hidden">
+      {/* Category Header */}
+      <div 
+        className="p-4 border-b flex items-center justify-between sticky top-0 bg-white z-10"
+        style={{ borderColor: `${category.color}40` }}
       >
-        {category.name} ({notes.length})
-      </h2>
-      <div className="flex-grow space-y-3 overflow-y-auto pr-1 pb-2">
+        <div className="flex items-center gap-2">
+          <div 
+            className="w-3 h-3 rounded-full" 
+            style={{ backgroundColor: category.color }}
+          ></div>
+          <h2 
+            className="font-medium text-gray-900"
+            style={{ color: category.color }} 
+          >
+            {category.name}
+          </h2>
+        </div>
+        <Badge 
+          variant="outline" 
+          className="text-xs"
+          style={{ 
+            backgroundColor: `${category.color}10`,
+            borderColor: `${category.color}30`, 
+            color: category.color 
+          }}
+        >
+          {notes.length}
+        </Badge>
+      </div>
+      
+      {/* Notes Container */}
+      <div className="flex-grow p-3 space-y-3 overflow-y-auto max-h-[calc(100vh-220px)] bg-gray-50">
         {notes.length > 0 ? (
           notes.map(note => (
             <NoteCard 
               key={note.id} 
               note={note} 
-              // onClick={() => handleNoteClick(note.id)} // Removed onClick prop
             />
           ))
         ) : (
-          <p className="text-sm text-gray-400 text-center py-4">No notes in this category yet.</p>
+          <div className="flex flex-col items-center justify-center h-full min-h-[120px] text-center">
+            <p className="text-sm text-gray-400">No notes in this category</p>
+            <p className="text-xs text-gray-300 mt-1">Notes you create will appear here</p>
+          </div>
         )}
       </div>
     </div>
