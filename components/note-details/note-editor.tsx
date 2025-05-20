@@ -3,15 +3,14 @@
  * 
  * Purpose:
  * Displays the main content area for a note using a Tiptap rich-text editor.
- * It includes a toolbar for formatting options.
+ * It updates the parent component with content changes for centralized saving.
  * 
  * Functionality:
- * - Initializes a Tiptap editor instance with StarterKit and Placeholder extensions.
- * - Renders RichTextToolbar, passing the editor instance.
- * - Renders EditorContent for the actual text editing area.
- * - Uses initialContent to set the editor's starting content.
- * - Logs content changes for debugging.
- * - (Future) Will handle content changes and saving.
+ * - Initializes a Tiptap editor instance.
+ * - Renders RichTextToolbar and EditorContent.
+ * - Uses `initialContent` to set the editor's starting content.
+ * - Calls `onContentChange` (passed from parent) when editor content is updated,
+ *   allowing the parent to manage the content state and orchestrate saves.
  * 
  * Location: /components/note-details/note-editor.tsx
  */
@@ -24,16 +23,16 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { Color } from '@tiptap/extension-color';
 import TextStyle from '@tiptap/extension-text-style';
 import RichTextToolbar from '@/components/rich-text-editor/RichTextToolbar';
-import { updateNoteAction } from '@/actions/notes-actions';
+// updateNoteAction is no longer called directly from here.
 
 interface NoteEditorProps {
-  noteId: string; // For saving
+  noteId: string; // Still useful for context, though save is external
   initialContent: string;
   categoryColor?: string;
-  onContentChange?: (htmlContent: string) => void; // Optional: for immediate parent feedback
+  onContentChange: (htmlContent: string) => void; // Mandatory callback
 }
 
-const SAVE_DEBOUNCE_DELAY = 1500; // 1.5 seconds
+const CONTENT_UPDATE_DEBOUNCE_DELAY = 750; // ms to wait after typing stops to call onContentChange
 
 const NoteEditor: React.FC<NoteEditorProps> = ({ 
   noteId, 
@@ -41,47 +40,27 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   categoryColor,
   onContentChange 
 }) => {
-  const [isSaving, setIsSaving] = useState(false);
-  const [lastSavedContent, setLastSavedContent] = useState(initialContent);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Debounced save function
-  const debouncedSave = useCallback(
-    async (htmlContent: string) => {
-      if (htmlContent === lastSavedContent) {
-        console.log("NoteEditor: Content unchanged, skipping save.");
-        return;
-      }
-      setIsSaving(true);
-      console.log("NoteEditor: Debounced save triggered for noteId:", noteId);
-      try {
-        const result = await updateNoteAction(noteId, { content: htmlContent });
-        if (result.isSuccess) {
-          console.log("NoteEditor: Content saved successfully.");
-          setLastSavedContent(htmlContent);
-        } else {
-          console.error("NoteEditor: Failed to save content - ", result.message);
-          // TODO: Consider adding user feedback for save failure (e.g., toast notification)
-        }
-      } catch (error) {
-        console.error("NoteEditor: Error during debounced save - ", error);
-        // TODO: User feedback
-      }
-      setIsSaving(false);
+  // Callback to inform parent of content change, debounced
+  const debouncedNotifyParentOfChange = useCallback(
+    (htmlContent: string) => {
+      onContentChange(htmlContent);
+      // console.log("NoteEditor: Notified parent of content change.");
     },
-    [noteId, lastSavedContent] // Dependencies for useCallback
+    [onContentChange]
   );
 
   const editor = useEditor({
     extensions: [
-      StarterKit, // Using default StarterKit to ensure all basic extensions are enabled
-      TextStyle, // Added TextStyle
-      Color, // Added Color
+      StarterKit,
+      TextStyle,
+      Color,
       Placeholder.configure({
         placeholder: 'Start typing your note here...',
       }),
     ],
-    content: initialContent,
+    content: initialContent, // Set initial content
     editorProps: {
       attributes: {
         class: 
@@ -90,51 +69,48 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     },
     onUpdate: ({ editor: currentEditor }) => {
       const html = currentEditor.getHTML();
-      if (onContentChange) {
-        onContentChange(html);
+      
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
       }
-
-      // Clear previous timeout
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-
-      // Setup a new timeout to call debouncedSave
-      saveTimeoutRef.current = setTimeout(() => {
-        debouncedSave(html);
-      }, SAVE_DEBOUNCE_DELAY);
+      updateTimeoutRef.current = setTimeout(() => {
+        debouncedNotifyParentOfChange(html);
+      }, CONTENT_UPDATE_DEBOUNCE_DELAY);
     },
+    // onBlur: ({ editor: currentEditor }) => { // Alternative: update parent on blur
+    //   const html = currentEditor.getHTML();
+    //   onContentChange(html);
+    //   if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current); // Clear timeout if blur happens
+    // }
   });
 
-  // Effect to clear timeout on unmount or if editor/debouncedSave changes
-  useEffect(() => {
-    // Cleanup function to clear the timeout
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, []); // Empty dependency array means this runs on mount and cleans up on unmount
-
+  // Effect to update editor content if initialContent prop changes from parent
+  // This is important if the parent component might provide new initialContent
+  // after the editor has already initialized (e.g. after a save and re-fetch).
   useEffect(() => {
     if (editor && editor.isEditable) {
       const currentEditorContent = editor.getHTML();
       if (initialContent !== currentEditorContent) {
-        console.log("NoteEditor: useEffect - initialContent changed. Updating editor content.");
-        console.log("NoteEditor: useEffect - Old editor content:", currentEditorContent);
-        console.log("NoteEditor: useEffect - New initialContent:", initialContent);
-        editor.commands.setContent(initialContent, false); 
-        setLastSavedContent(initialContent); // Update lastSavedContent when initialContent changes
+        // console.log("NoteEditor: initialContent prop changed. Updating editor content.");
+        editor.commands.setContent(initialContent, false); // false to avoid triggering onUpdate again
       }
     }
   }, [initialContent, editor]);
 
-  // Style for the outer container with border and glow
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const editorWrapperStyle: React.CSSProperties = {
-    border: `1px solid ${categoryColor || '#e0e0e0'}`, // Default to a light gray
+    border: `1px solid ${categoryColor || '#e0e0e0'}`,
     boxShadow: `0 0 12px ${categoryColor ? categoryColor + '30' : 'rgba(0, 0, 0, 0.08)'}`, 
-    borderRadius: '0.375rem', // Corresponds to rounded-md
-    overflow: 'hidden', // To ensure children (toolbar, editor content) respect border radius
+    borderRadius: '0.375rem',
+    overflow: 'hidden',
   };
 
   return (
@@ -144,7 +120,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
         style={editorWrapperStyle}
       >
         <RichTextToolbar editor={editor as Editor | null}/>
-        {/* Inner container for the dashed border effect and EditorContent */}
         <div className="relative flex-grow p-2 bg-white">
           <div 
             className="absolute inset-2 border-2 border-dashed border-gray-300 rounded pointer-events-none"

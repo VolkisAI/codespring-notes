@@ -15,14 +15,14 @@
  * 
  * Location: /app/dashboard/notes/[note-id]/page.tsx
  */
+// This is now a PURE Server Component
 import React from 'react';
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server"; // Correct static import for Server Component
 import { getNoteByIdAction } from '@/actions/notes-actions';
 import { getCategoryByIdAction } from '@/actions/categories-actions';
-import NoteHeader from '@/components/note-details/note-header';
-import NoteEditor from '@/components/note-details/note-editor';
 import { SelectNote, SelectCategory } from '@/db/schema';
-import { redirect } from 'next/navigation';
+import { redirect } from 'next/navigation'; // For server-side redirects
+import NoteDetailPageClient from './page-client'; // Import the new client component
 
 interface NoteDetailPageProps {
   params: {
@@ -35,21 +35,20 @@ const NoteDetailPage = async ({ params }: NoteDetailPageProps) => {
   const noteId = params['note-id'];
 
   if (!userId) {
-    // This should ideally be handled by middleware, but good to have a check.
-    redirect('/sign-in'); // Or your app's sign-in page
+    redirect('/sign-in');
   }
 
   if (!noteId) {
-    return <div className="p-4 text-red-500">Note ID is missing.</div>;
+    // This could be a more user-friendly error page or component
+    return <div className="p-4 text-red-500 text-center mt-10">Error: Note ID is missing. Cannot load note details.</div>;
   }
 
   const noteResult = await getNoteByIdAction(noteId);
-  let note: SelectNote | undefined = undefined;
-  let category: SelectCategory | null | undefined = null;
+  let initialNoteData: SelectNote | undefined = undefined;
+  let initialCategoryData: SelectCategory | null = null;
 
   if (noteResult.isSuccess && noteResult.data) {
     if (noteResult.data.userId !== userId) {
-      // Note does not belong to the current user
       return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
           <div className="bg-white p-8 rounded-lg shadow-md text-center">
@@ -62,22 +61,24 @@ const NoteDetailPage = async ({ params }: NoteDetailPageProps) => {
         </div>
       );
     }
-    note = noteResult.data;
-    if (note.categoryId) {
-      const categoryResult = await getCategoryByIdAction(note.categoryId);
+    initialNoteData = noteResult.data;
+    if (initialNoteData.categoryId) {
+      const categoryResult = await getCategoryByIdAction(initialNoteData.categoryId);
       if (categoryResult.isSuccess && categoryResult.data) {
-        category = categoryResult.data;
+        initialCategoryData = categoryResult.data;
       } else {
-        console.warn(`Failed to fetch category ${note.categoryId}: ${categoryResult.message}`);
-        // Category might be null if it was deleted or an error occurred, header handles this
+        console.warn(`NoteDetailPage: Failed to fetch category ${initialNoteData.categoryId}: ${categoryResult.message}`);
+        // initialCategoryData remains null, which is handled by the client component
       }
     }
   } else {
+    // Note not found or error fetching
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
         <div className="bg-white p-8 rounded-lg shadow-md text-center">
           <h1 className="text-2xl font-semibold text-red-600 mb-4">Note Not Found</h1>
-          <p className="text-gray-700">The note you are looking for does not exist or could not be loaded.</p>
+          <p className="text-gray-700">The note you are looking for ({noteId}) does not exist or could not be loaded.</p>
+          <p className="text-xs text-gray-400 mt-1">({noteResult.message})</p>
           <a href="/dashboard/notes" className="mt-6 inline-block px-6 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
             Go to My Notes
           </a>
@@ -86,17 +87,13 @@ const NoteDetailPage = async ({ params }: NoteDetailPageProps) => {
     );
   }
 
-  return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      <NoteHeader note={note} category={category} />
-      <NoteEditor 
-        noteId={note.id} 
-        initialContent={note.content || ''} 
-        categoryColor={category?.color}
-      />
-      {/* Future: Formatting toolbar could go here or within NoteEditor */}
-    </div>
-  );
+  // If, after all checks, initialNoteData is still not populated (should be caught by the else block above)
+  if (!initialNoteData) {
+    return <div className="p-4 text-red-500 text-center mt-10">Error: Critical issue loading note data. Please try again.</div>;
+  }
+
+  // Render the client component with the fetched data
+  return <NoteDetailPageClient initialNote={initialNoteData} initialCategory={initialCategoryData} />;
 };
 
 export default NoteDetailPage; 

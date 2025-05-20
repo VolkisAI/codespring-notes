@@ -164,14 +164,16 @@ const NotesBoard: React.FC<NotesBoardProps> = ({ initialCategories }) => {
                 </TabsTrigger>
               </TabsList>
               
-              <Button 
-                onClick={() => setShowAddNoteModal(true)} 
-                className="rounded-full shadow-lg" 
-                disabled={initialCategories.length === 0}
-              >
-                <PlusCircle className="h-4 w-4 mr-1" />
-                New Note
-              </Button>
+              {viewMode === 'table' && (
+                <Button 
+                  onClick={() => setShowAddNoteModal(true)} 
+                  className="rounded-full shadow-lg"
+                  disabled={initialCategories.length === 0}
+                >
+                  <PlusCircle className="h-4 w-4 mr-1" />
+                  New Note
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -287,7 +289,7 @@ const NotesBoard: React.FC<NotesBoardProps> = ({ initialCategories }) => {
         </TabsContent>
       </div>
 
-      {showAddNoteModal && (
+      {viewMode === 'table' && showAddNoteModal && (
         <AddNoteModal 
           onClose={() => setShowAddNoteModal(false)} 
           onNoteAdded={handleNoteAdded} 

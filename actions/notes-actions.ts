@@ -154,4 +154,49 @@ export async function deleteNotesAction(
     console.error("deleteNotesAction Error: ", errorMessage);
     return { isSuccess: false, message: errorMessage };
   }
+}
+
+export async function createQuickNoteAction(
+  categoryId: string,
+  userId: string,
+  title?: string // Optional title, can default in the action
+): Promise<ActionResult<SelectNote>> {
+  if (!userId) {
+    console.error("createQuickNoteAction Error: User not authenticated.");
+    return { isSuccess: false, message: "User not authenticated." };
+  }
+  if (!categoryId) {
+    console.error("createQuickNoteAction Error: Category ID is required.");
+    return { isSuccess: false, message: "Category ID is required." };
+  }
+
+  const noteData: InsertNote = {
+    title: title || "Untitled Note", // Default title if not provided
+    content: "", // Default empty content
+    categoryId: categoryId,
+    userId: userId,
+    // createdAt and updatedAt will be handled by the DB schema defaults (e.g., defaultNow())
+  };
+
+  try {
+    const newNote = await createNote(noteData); // Reuse existing createNote query
+    
+    // Revalidate paths
+    revalidatePath("/dashboard/notes"); // Main notes board
+    revalidatePath(`/dashboard/notes/${newNote.id}`); // The new note's page
+    // Consider revalidating the specific category view if your setup uses query params for that
+    // For example: revalidatePath(`/dashboard/notes?category=${categoryId}`);
+    // However, revalidating /dashboard/notes might cover general updates effectively.
+
+    return {
+      isSuccess: true,
+      message: "Note created successfully and quickly!",
+      data: newNote,
+    };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error creating quick note";
+    console.error("createQuickNoteAction Error: ", errorMessage, error);
+    return { isSuccess: false, message: errorMessage };
+  }
 } 
